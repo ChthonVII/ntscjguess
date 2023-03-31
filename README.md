@@ -17,10 +17,16 @@ Useful notes about ESUI themes:
 ```
 ..\ff7.exe
 
-9261F8 = AB 4B 00 80 4E 3D 00 80 7D 57 00 80 1E 00 02
-91EFC8 = AB 4B 00 80 4E 3D 00 80 7D 57 00 80 1E 00 02 80 00 4B AB 00 3D 4E 00 57 7D 02 00 1E
+9261F8 = B0 58 00 80 50 3F 00 80 80 5C 00 80 20 00 00
+91EFC8 = B0 58 00 80 50 3F 00 80 80 5C 00 80 20 00 00 80 00 58 B0 00 3F 50 00 5C 80 00 00 20
 ```
 - The first line is four BGRA8 values (missing the alpha component for the last one).
 - The second line is the same four BGRA8 values (this time including the alpha component for the last one) followed by four RGB8 values for the same colors.
 - The remaining files just copy the second line with various Delay values.
-- Just plug the colors into ntscjguess and revise the hext files accordingly.
+- Just plug the colors into ntscjguess and revise the hext files accordingly. For instance, the above example revises to this:
+```
+..\ff7.exe
+
+9261F8 = AB 4B 00 80 4E 3D 00 80 7D 57 00 80 1E 00 02
+91EFC8 = AB 4B 00 80 4E 3D 00 80 7D 57 00 80 1E 00 02 80 00 4B AB 00 3D 4E 00 57 7D 02 00 1E
+```
