@@ -32,16 +32,11 @@ const float ConversionMatrix[3][3] = {
     {-0.024443490594835, -0.048150182045316, 1.07259361295816}
 };
 
-// RGB <--> XYZ matrices, assuming sRGB gamut for RGB
+// RGB --> XYZ matrix, assuming sRGB gamut for RGB
 const float RGBtoXYZMatrix[3][3] = {
     {0.412410846488539, 0.357584567852952, 0.180453803933608},
     {0.212649342720653, 0.715169135705904, 0.072181521573443},
     {0.01933175842915, 0.119194855950984, 0.950390034050337}
-};
-const float XYZtoRGBMatrix[3][3] = {
-    {3.24081239889528, -1.53730844562981, -0.498586522906966},
-    {-0.969243017008641, 1.87596630290857, 0.041555030856686},
-    {0.055638398436113, -0.204007460932414, 1.05712957028614}
 };
 
 // clamp a float between 0.0 and 1.0
@@ -61,15 +56,7 @@ long int rgbtoint(float input){
     return (int)(input * 255.0);
 }
 
-
-
-// sRGB gamma functions
-float togamma(float input){
-    if (input <= 0.0031308){
-        return clampfloat(input * 12.92);
-    }
-    return clampfloat((1.055 * pow(input, (1.0/2.4))) - 0.055);
-}
+// sRGB inverse gamma function
 float tolinear(float input){
     if (input <= 0.04045){
         return clampfloat(input / 12.92);
@@ -77,7 +64,7 @@ float tolinear(float input){
     return clampfloat(pow((input + 0.055) / 1.055, 2.4));
 }
 
-struct pixel {
+struct pixelf32 {
     float red;
     float green;
     float blue;
@@ -89,28 +76,23 @@ struct pixel8{
     unsigned char blue;
 };
 
-void printpixel(struct pixel input){
-    printf("red: %f, green: %f, blue %f\n", input.red, input.green, input.blue);
-    return;
-}
-
-struct pixel pixelfromint(long int input){
-    struct pixel output;
+struct pixelf32 pixelfromint(long int input){
+    struct pixelf32 output;
     output.red = rgbtofloat(input >> 16);
     output.green = rgbtofloat((input & 0x0000FF00) >> 8);
     output.blue = rgbtofloat(input & 0x000000FF);
     return output;
 }
 
-struct pixel pixelfrompixel8(struct pixel8 input){
-    struct pixel output;
+struct pixelf32 pixelfrompixel8(struct pixel8 input){
+    struct pixelf32 output;
     output.red = rgbtofloat(input.red);
     output.green = rgbtofloat(input.green);
     output.blue = rgbtofloat(input.blue);
     return output;
 }
 
-struct pixel8 pixel8frompixel(struct pixel input){
+struct pixel8 pixel8frompixel(struct pixelf32 input){
     struct pixel8 output;
     output.red = rgbtoint(input.red);
     output.green = rgbtoint(input.green);
@@ -118,24 +100,16 @@ struct pixel8 pixel8frompixel(struct pixel input){
     return output;
 }
 
-struct pixel pixeltolinear(struct pixel input){
-    struct pixel output;
+struct pixelf32 pixeltolinear(struct pixelf32 input){
+    struct pixelf32 output;
     output.red = tolinear(input.red);
     output.green = tolinear(input.green);
     output.blue = tolinear(input.blue);
     return output;
 }
 
-struct pixel pixeltogamma(struct pixel input){
-    struct pixel output;
-    output.red = togamma(input.red);
-    output.green = togamma(input.green);
-    output.blue = togamma(input.blue);
-    return output;
-}
-
-struct pixel NTSCJtoSRGB(struct pixel input){
-    struct pixel output;
+struct pixelf32 NTSCJtoSRGB(struct pixelf32 input){
+    struct pixelf32 output;
     
     // Multiply by our pre-computed NTSC-J to sRGB Bradford matrix
     output.red = ConversionMatrix[0][0] * input.red + ConversionMatrix[0][1] * input.green + ConversionMatrix[0][2] * input.blue;
@@ -150,8 +124,8 @@ struct pixel NTSCJtoSRGB(struct pixel input){
     return output;
 }
 
-struct pixel RGBtoXYZ(struct pixel input){
-    struct pixel output;
+struct pixelf32 RGBtoXYZ(struct pixelf32 input){
+    struct pixelf32 output;
     
     output.red = RGBtoXYZMatrix[0][0] * input.red + RGBtoXYZMatrix[0][1] * input.green + RGBtoXYZMatrix[0][2] * input.blue;
     output.green = RGBtoXYZMatrix[1][0] * input.red + RGBtoXYZMatrix[1][1] * input.green + RGBtoXYZMatrix[1][2] * input.blue;
@@ -165,28 +139,13 @@ struct pixel RGBtoXYZ(struct pixel input){
     return output;
 }
 
-struct pixel XYZtoRGB(struct pixel input){
-    struct pixel output;
-    
-    output.red = XYZtoRGBMatrix[0][0] * input.red + XYZtoRGBMatrix[0][1] * input.green + XYZtoRGBMatrix[0][2] * input.blue;
-    output.green = XYZtoRGBMatrix[1][0] * input.red + XYZtoRGBMatrix[1][1] * input.green + XYZtoRGBMatrix[1][2] * input.blue;
-    output.blue = XYZtoRGBMatrix[2][0] * input.red + XYZtoRGBMatrix[2][1] * input.green + XYZtoRGBMatrix[2][2] * input.blue;
-    
-    // clamp values to 0 to 1 range
-    output.red = clampfloat(output.red);
-    output.green = clampfloat(output.green);
-    output.blue = clampfloat(output.blue);
-    
-    return output;
-}
-
 // start with 8bit pixel, convert to float, linearize, gamut convert, convert to XYZ
-struct pixel processpixel8(struct pixel8 input){
+struct pixelf32 processpixel8(struct pixel8 input){
     return RGBtoXYZ(NTSCJtoSRGB(pixeltolinear(pixelfrompixel8(input))));
 }
 
 // distance between 2 pixels. should only be used in XYZ color space
-float distance(struct pixel pixA, struct pixel pixB){
+float distance(struct pixelf32 pixA, struct pixelf32 pixB){
     float diffr = pixA.red - pixB.red;
     float diffg = pixA.green - pixB.green;
     float diffb = pixA.blue - pixB.blue;
@@ -194,6 +153,35 @@ float distance(struct pixel pixA, struct pixel pixB){
     diffg = pow(diffg, 2.0);
     diffb = pow(diffb, 2.0);
     return pow(diffr + diffg + diffb, 0.5);
+}
+
+/*
+ * Checks if input color plus offsets, when converted from NTSC-J to sRGB is closer to goal than current besterror
+ * Returns true if so; else false
+ * If true, sets besterror and bestguess accordingly, and sets saved offsets to inverse of offsets.
+*/
+bool checknearbycolor(struct pixel8 input, int roffset, int goffset, int boffset, struct pixelf32 goal, float* besterror, struct pixel8* bestguess, int* saveroffset, int* savegoffset, int* saveboffset){
+    int newred = (int)input.red + roffset;
+    int newgreen = (int)input.green + goffset;
+    int newblue = (int)input.blue + boffset;
+    if (newred < 0) return false;
+    if (newred > 255) return false;
+    if (newgreen < 0) return false;
+    if (newgreen > 255) return false;
+    if (newblue < 0) return false;
+    if (newblue > 255) return false;
+    struct pixel8 newcolor = {newred, newgreen, newblue};
+    struct pixelf32 testoutput = processpixel8(newcolor);
+    float newerror = distance(testoutput, goal);
+    if (newerror <= *besterror){
+        *besterror = newerror;
+        *bestguess = newcolor;
+        *saveroffset = roffset * -1;
+        *savegoffset = goffset * -1;
+        *saveboffset = boffset * -1;
+        return true;
+    }
+    return false;
 }
 
 int main(int argc, const char **argv){
@@ -219,102 +207,55 @@ int main(int argc, const char **argv){
             inputok = false;
         }
         if (inputok){
-            struct pixel inputpixel = pixelfromint(input);
-            struct pixel linearinputpixel = pixeltolinear(inputpixel);
-            struct pixel goal = RGBtoXYZ(linearinputpixel);
+            struct pixelf32 inputpixel = pixelfromint(input);
+            struct pixelf32 linearinputpixel = pixeltolinear(inputpixel);
+            struct pixelf32 goal = RGBtoXYZ(linearinputpixel);
             
-            // start with the target as the first guess
-            //struct pixel8 firstguess = pixel8frompixel(pixeltogamma(convertedinputpixel));
+            // start with the target as the first guess (this should be in the right neighborhood)
             struct pixel8 firstguess = pixel8frompixel(inputpixel);
-            struct pixel firstguessoutput = processpixel8(firstguess);
+            struct pixelf32 firstguessoutput = processpixel8(firstguess);
             float firsterror = distance(firstguessoutput, goal);
             
             float besterror = firsterror;
             struct pixel8 bestguess = firstguess;
+            int lasti = 0;
+            int lastj = 0;
+            int lastk = 0;
             
+            // hill climb to the input that converts to sRGB color closest to goal
             while (true){
+                
                 bool foundbetterguess = false;
-                struct pixel8 lastguess = bestguess;
-                struct pixel8 newguess = bestguess;
+                struct pixel8 thisguess = bestguess;
+                int thisi = 0;
+                int thisj = 0;
+                int thisk = 0;
                 
-                if (newguess.red < 255){
-                    newguess.red++;
-                    struct pixel newguessoutput = processpixel8(newguess);
-                    float newerror = distance(newguessoutput, goal);
-                    if (newerror < besterror){
-                        foundbetterguess = true;
-                        besterror = newerror;
-                        bestguess = newguess;
+                // test increments of +/-1 on all axes (14 directions)
+                for (int i = -1; i<=1; i++){
+                    for (int j = -1; j<=1; j++){
+                        for (int k = -1; k<=1; k++){
+                            // skip the input color
+                            if ((i == 0) && (j == 0) && (k == 0)) continue;
+                            // don't go back to where we just came from
+                            if ((i == lasti) && (j == lastj) && (k == lastk)) continue;
+                            if(checknearbycolor(thisguess, i, j, k, goal, &besterror, &bestguess, &thisi, &thisj, &thisk)){
+                                foundbetterguess = true;
+                            }
+                        }
                     }
                 }
+                // save out the reverse of the direction we just moved
+                lasti = thisi;
+                lastj = thisj;
+                lastk = thisk;
                 
-                newguess = lastguess;
-                if (newguess.red > 0){
-                    newguess.red--;
-                    struct pixel newguessoutput = processpixel8(newguess);
-                    float newerror = distance(newguessoutput, goal);
-                    if (newerror < besterror){
-                        foundbetterguess = true;
-                        besterror = newerror;
-                        bestguess = newguess;
-                    }
-                }
-                
-                newguess = lastguess;
-                if (newguess.green < 255){
-                    newguess.green++;
-                    struct pixel newguessoutput = processpixel8(newguess);
-                    float newerror = distance(newguessoutput, goal);
-                    if (newerror < besterror){
-                        foundbetterguess = true;
-                        besterror = newerror;
-                        bestguess = newguess;
-                    }
-                }
-                
-                newguess = lastguess;
-                if (newguess.green > 0){
-                    newguess.green--;
-                    struct pixel newguessoutput = processpixel8(newguess);
-                    float newerror = distance(newguessoutput, goal);
-                    if (newerror < besterror){
-                        foundbetterguess = true;
-                        besterror = newerror;
-                        bestguess = newguess;
-                    }
-                }
-                
-                newguess = lastguess;
-                if (newguess.blue < 255){
-                    newguess.blue++;
-                    struct pixel newguessoutput = processpixel8(newguess);
-                    float newerror = distance(newguessoutput, goal);
-                    if (newerror < besterror){
-                        foundbetterguess = true;
-                        besterror = newerror;
-                        bestguess = newguess;
-                    }
-                }
-                
-                newguess = lastguess;
-                if (newguess.blue > 0){
-                    newguess.blue--;
-                    struct pixel newguessoutput = processpixel8(newguess);
-                    float newerror = distance(newguessoutput, goal);
-                    if (newerror < besterror){
-                        foundbetterguess = true;
-                        besterror = newerror;
-                        bestguess = newguess;
-                    }
-                }
-                
-                // if the guess didn't improve, we are done
                 if (!foundbetterguess){
-                    printf("To achieve sRGB output of 0x%X use NTSC-J input of 0x%02X%02X%02X (red: %i, green: %i, blue: %i, error %f).\n", input, bestguess.red, bestguess.green, bestguess.blue, bestguess.red, bestguess.green, bestguess.blue, besterror);
+                    printf("To achieve sRGB output of 0x%06X use NTSC-J input of 0x%02X%02X%02X (red: %i, green: %i, blue: %i, error %f).\n", input, bestguess.red, bestguess.green, bestguess.blue, bestguess.red, bestguess.green, bestguess.blue, besterror);
                     break;
                 }
+                
             } // end of while true
-            
             
             output = 0; // all good
         } // end if inputok
