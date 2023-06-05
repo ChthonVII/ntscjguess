@@ -1,4 +1,7 @@
 # ntscjguess
+
+**Superceded by gamutthingy**
+
 Finds the NTSC-J color that converts to a given sRGB color.
 
 Principally intended for fixing Final Fantasy 7 ESUI themes that have their text box backgrounds broken by the change to treat hardcoded colors as using the NTSC-J color gamut ([72c329e](https://github.com/ChthonVII/FFNx/commit/72c329ebf727830633ddeac6abb5d41c1aff2c83)).
